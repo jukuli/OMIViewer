@@ -1,0 +1,16 @@
+<Objects xmlns="http://www.opengroup.org/xsd/odf/1.0/">
+          <Object>
+            <id>OMI-Service</id>
+            <Object>
+              <id>Settings</id>
+              <InfoItem name="num-latest-values-stored">   
+
+
+                <value unixTime="1505253257" type="xs:integer" dateTime="2017-09-13T00:54:17.948+03:00">50</value>
+              </InfoItem>
+            </Object>
+          </Object>
+        </Objects>
+
+
+
