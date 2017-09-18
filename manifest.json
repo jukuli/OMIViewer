@@ -12,7 +12,7 @@
   },
   "background": {
 	"persistent":false,
-	"scripts":["background.js","jquery-3.2.1.js"]
+	"scripts":["background.js","jquery-3.2.1.js","tweetnacl-js/nacl.min.js","tweetnacl-util-js/nacl-util.js","node_modules/crypto-js/crypto-js.js"]
   },
   "content_scripts": [{
     "matches": ["*://*.google.com/*"],
@@ -21,6 +21,7 @@
   "permissions": [
     "activeTab",
     "https://ajax.googleapis.com/",
-    "<all_urls>"
+    "<all_urls>",
+    "storage" 
   ]
 }
