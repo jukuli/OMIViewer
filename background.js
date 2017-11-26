@@ -55,10 +55,131 @@ function hopefullyWorking(response){
 
 }
 function searchBlockstackExplorer(id){
-	var baseURL = "http://localhost:6270/v1/names/"
+	//var baseURL = "http://localhost:6270/v1/names/"
+	var baseURL = "https://core.blockstack.org/v2/users/"; 	
 	var results = getURL("GET",baseURL+id);
 	//var results = getURL("POST","testjson.json");
 	return results;
+}
+function parseProfileJson(searchId,jsonString){
+	try{	
+		var json = $.parseJSON(jsonString);
+		var first = json[searchId];
+		// get the omiJson Url		
+		var profile = first.profile;
+		var accounts = profile.account;
+		var omiUrl = "";		
+		$.each(accounts, function(i,item){
+			if(item.service == "omiviewer" && item.identifier =="omi_nodes")
+				omiUrl = item.contentUrl;
+		});
+		chrome.storage.local.set({"omiJsonUrl":omiUrl});		
+		console.log(omiUrl);
+		
+		// get the publickey
+		var pubkeystr = "";		
+		$.each(first.zone_file.txt,function(i,item){
+			if(item.name == "pubkey")
+				pubkeystr = item.txt;		
+		});
+		var pubkey = pubkeystr.split("pubkey:data:")[1];
+		chrome.storage.local.set({"user_pubkey":pubkey});		
+		console.log("pubkey="+pubkey);
+		
+	}
+	catch(e){
+		throw e;	
+	}
+	console.log(json);	
+}
+function reloadParseOmiJson(){
+	console.log(blockstack);
+	chrome.storage.local.get(["omiJsonUrl","user_pubkey"],function(items){
+		var url = items["omiJsonUrl"];
+		var pubkey = items["user_pubkey"];
+		var signedjson = getURL("GET",url);
+		console.log(signedjson);
+		console.log(pubkey);
+		verifyJsonSignature(pubkey,signedjson);
+		
+		
+	}); 	
+	
+}
+function verifyJsonSignature(pubkey,signedjson){
+	var index1 = signedjson.indexOf('.');
+	var bsk2 = signedjson.substring(0,index1);
+	var rest1 = signedjson.substring(index1+1);
+	var index2 = rest1.indexOf('.');
+	var pubk = rest1.substring(0,index2);
+	var rest2 = rest1.substring(index2+1);
+	var index3 = rest2.indexOf('.');
+	var signature = rest2.substring(0,index3);
+	var datatxt = rest2.substring(index3+1);
+
+	var datalen = datatxt.substring(0,datatxt.indexOf(':'));
+	var data = datatxt.substring(datatxt.indexOf(':')+1);
+	// sometimes a extra \n is added. remove it.
+	if(data[data.length-1] == '\n')
+		data = data.substring(0,data.length-1);
+	if(data[data.length-1] != ',')
+		console.log("should throw an error, doesn't end in ,='"+data[data.length-1]+"'");
+	
+	if(pubkey != pubk)
+		console.log("public keys differ. Should throw exception");
+	
+	data = data.substring(0,data.length-1);
+	console.log(nacl.util);
+	console.log(nacl);
+	console.log(CryptoJS);
+	var sigbit = nacl.util.decodeBase64(signature);
+	
+	console.log("pubkey ='"+pubkey+"'");
+	if(pubkey[pubkey.length-1] == '\n'){
+		pubkey = pubkey.substring(0,pubkey.length-1);
+		console.log("pubkey last was '\n'");
+	}
+
+	var pubHex = CryptoJS.enc.Hex.parse(pubkey);
+	console.log("pubhex="+pubHex);
+	var pub64 = pubHex.toString(CryptoJS.enc.Base64);	
+	console.log("pub64="+pub64);	
+	var testpub ="VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIDEzIGxhenkgZG9ncy4=";	
+	var pubbit = nacl.util.decodeBase64(testpub);
+	
+	var databit = nacl.util.decodeUTF8(datatxt);
+	console.log("sigbit="+sigbit);
+	console.log("pubbit="+pubbit+" len="+pubbit.length);	
+	
+	console.log(nacl.sign.open(databit,pubbit));
+	console.log("verify signature="+nacl.sign.detached.verify(databit,sigbit,pubbit));
+
+	datajson = $.parseJSON(data);
+	
+	console.log(bsk2);
+	console.log(pubk);
+	console.log(signature);
+	console.log(datalen);
+	console.log(data);
+	console.log(data.length);
+	console.log(datajson); 
+	/*if(parts.length !=4)
+		throw Exception("signedjson didn't split to 4 parts");
+	if(parts[0] != "bsk2")
+		throw Exception("signed file didn't start with bsk2.");
+	
+	var jsonpub = parts[1];
+	var jsonsig = parts[2];
+	var datatxt = parts[3];
+	var [datalen,data] = datatxt.split(":",1);
+	
+	if(jsonpub != pubkey)
+		throw Exception("public keys differ");	
+	console.log(parts);
+	console.log(datatxt);
+	console.log(datalen);
+	console.log(data);
+	*/			
 }
 function getTestXML(filename){
 	xmlStr = getURL("POST",filename);
@@ -126,6 +247,8 @@ function(request, sender, sendResponse) {
                 "from the extension");
 	if (request.searchId){
 		var results = searchBlockstackExplorer(request.searchId);
+		parseProfileJson(request.searchId,results);
+		reloadParseOmiJson();
 		sendResponse(results);
 	}
 	else if (request.omiNodeUrl){
